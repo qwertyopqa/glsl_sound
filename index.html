@@ -11,11 +11,14 @@
         #define M_PI2 6.28318530717958647692528676755900576839
         precision highp float;
         out vec4 fragColor;
-        uniform float u_clock;
+        //out float fragColor;
+        uniform float u_curr_buffer;
+        uniform float u_sample_rate; // USUALLY 44100
+        uniform float u_buffer_size;
 
+        float channels = 1.;
         float time = 0.;
         float currSample = 0.;
-        float sampleRate = 44100.;
         float bar = 0.;
         float beat = 0.;
         float bpm = 300.;
@@ -45,7 +48,7 @@
             float bar = floor(n / samplesPerBar);
             SampleInfo info = SampleInfo(
                 n,
-                n/sampleRate,
+                n/u_sample_rate,
                 bar,
                 floor((n - bar * samplesPerBar) / samplesPerBeat)
             );
@@ -89,10 +92,17 @@
 
         float renderNote(float atSample, Note n) {
             float noteSecondsOffset = (atSample - n.startSample) * secondsPerSample;
-            return sin(noteSecondsOffset * getFreq(n.note) * M_PI2)
+            float freq = getFreq(n.note);
+            vec3 sines = vec3(
+                sin(noteSecondsOffset * freq * M_PI2) * .5,
+                sin(noteSecondsOffset * (freq * 0.505) * M_PI2) * .25,
+                sin(noteSecondsOffset * (freq * 1.995) * M_PI2) * .15
+            ) ;
+
+            return (sines.r + sines.g + sines.b) * .5
                 * n.vel
                 * getAREnv(noteSecondsOffset, n.atk, n.rel)
-                * .5;
+                * .2;
         }
 
         float render(float sampleN) {
@@ -110,25 +120,30 @@
         }
 
         void setupGlobals() {
-            secondsPerSample = 1. / sampleRate;
+            secondsPerSample = 1. / u_sample_rate;
             secondsPerBeat = 60. / bpm;
             secondsPerBar = secondsPerBeat * 4.;
-            samplesPerBeat = sampleRate * secondsPerBeat;
+            samplesPerBeat = u_sample_rate * secondsPerBeat;
             samplesPerBar = samplesPerBeat * 4.;
         }
 
         void main() {
             setupGlobals();
-            float st = (gl_FragCoord.x + gl_FragCoord.y * 512.) * 4.
-                + u_clock * sampleRate;
-            fragColor = vec4(render(st), render(st+1.), render(st+2.), render(st+3.));
-            //}
+            float st = (gl_FragCoord.x + gl_FragCoord.y * 512.) * channels
+                + u_curr_buffer * u_buffer_size;
+                if (channels == 1.) {
+                    fragColor = vec4(render(st), 0., 0., 0.);
+                } else {
+                    fragColor = vec4(render(st), render(st+1.), render(st+2.), render(st+3.));
+            }
         }
     </script>
     <script type="text/javascript">
         let started = false;
         const canvas = new OffscreenCanvas(512, 512);
+        const bufferinSecs = .2;
         const gl = canvas.getContext('webgl2');
+        const channels = 1;
         if (!gl) {
             console.error("Unable to initialize WebGL 2. Your browser may not support it.");
         }
@@ -137,15 +152,17 @@
         function audioSetup() {
             const ctx = new AudioContext();
             const sampleRate = ctx.sampleRate; // often 44100 Hz
-            const bufferSize = sampleRate * 1; // total number of samples = sampleRate * duration
+            const bufferSize = sampleRate * bufferinSecs; // total number of samples = sampleRate * duration
+            document.getElementById("sampleRateUx").innerText = sampleRate;
+
             return {
                 ctx,
                 sampleRate, // often 44100 Hz
                 buffer: {
-                    size: sampleRate * 1, // total number of samples = sampleRate * duration
+                    size: bufferSize, // total number of samples = sampleRate * duration
                     obj: {
                         w: 512,
-                        h: Math.ceil((sampleRate * 1) / 512 / 4)
+                        h: Math.ceil((bufferSize) / 512 / channels)
                     },
                     data: ctx.createBuffer(2, bufferSize * 2, sampleRate)
                 }
@@ -171,9 +188,9 @@
                 init();
             }
         });
+
         function init () {
             const audio = audioSetup();
-
             const program = gl.createProgram();
             gl.attachShader(program, addInlineShader("shader-vs"));
             gl.attachShader(program, addInlineShader("shader-fs"));
@@ -183,10 +200,17 @@
                 return;
             }
             gl.useProgram(program);
-            var clockLoc = gl.getUniformLocation(program, "u_clock");
-            gl.uniform1f(clockLoc, 0.);
 
-            // ... At this point, execute shader and use gl.readPixels to read audio data ...
+            // UNIFORMS
+            var bufferIndexLoc = gl.getUniformLocation(program, "u_curr_buffer");
+            gl.uniform1f(bufferIndexLoc, 0.);
+            var bufferLengthLoc = gl.getUniformLocation(program, "u_buffer_size");
+            gl.uniform1f(bufferLengthLoc, audio.buffer.size);
+            var sampleRateLoc = gl.getUniformLocation(program, "u_sample_rate");
+            gl.uniform1f(sampleRateLoc, audio.sampleRate);
+
+
+            /// INIT THE VERTICES FOR THE TRIANGLE STRIP
             const v = 1.0;
             let vertices = new Float32Array([-v, v, -v, -v, v, v, v, -v]);
             let vertexBuffer = gl.createBuffer();
@@ -196,12 +220,15 @@
             gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(position);
 
+            // INITIALIZES THE CONTEXT FRAMEBUFFER
             let framebuffer = gl.createFramebuffer();
             gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
 
+            // INITIALIZES THE TEXTURE
             let texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, audio.buffer.obj.w, audio.buffer.obj.h, 0, gl.RGBA, gl.FLOAT, null);
+            //gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, audio.buffer.obj.w, audio.buffer.obj.h, 0, gl.RGBA, gl.FLOAT, null); // <- 4 channels
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, audio.buffer.obj.w, audio.buffer.obj.h, 0, gl.RED, gl.FLOAT, null);
 
             try {
                 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
@@ -219,18 +246,23 @@
                 console.error("Error setting up framebuffer::" + fbStatus);
                 return;
             }
-            let time = 0;
+
+            let time = Date.now();
             let rendered = false;
-            let clock = 0.0;
-            let where = false;
-            let audioData = new Float32Array(512 * 512); // 4 for RGBA channels
+            let curr_buffer_index = 0.0;
+            let where = true;
+            let audioData = new Float32Array(audio.buffer.obj.w * audio.buffer.obj.h * channels);
+
             function render() {
                 const now = Date.now();
-                if (!rendered && now - time > 800) {
+                if (!rendered) {
                     /// NOW!!! get DA DATA!!!
-                    gl.uniform1f(clockLoc, clock);
+                    gl.uniform1f(bufferIndexLoc, curr_buffer_index);
                     gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length * .5);
-                    gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RGBA, gl.FLOAT, audioData); // GRAB IT!!
+                    // GRAB IT!!
+                    //gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RGBA, gl.FLOAT, audioData);  // <- 4 channels
+                    gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RED, gl.FLOAT, audioData);
+
                     let sizedAudioData = audioData.subarray(0, audio.buffer.size);
                     audio.buffer.data.copyToChannel(sizedAudioData, 0, !where ? 0 : audio.buffer.size); // Left Channel
                     audio.buffer.data.copyToChannel(sizedAudioData, 1, !where ? 0 : audio.buffer.size); // Right Channel
@@ -238,14 +270,12 @@
                     where = !where;
                     rendered = true;
                 }
-                if (now - time >= 990) {
-                    clock += 1.0;
-                    time = now;
+                if (now - time >= bufferinSecs * 1000.) {
+                    curr_buffer_index += 1.0;
+                    time += bufferinSecs * 1000.;
                     rendered = false;
                 }
-                let nxt = Math.min(time + 990 - now, 200);
-                nxt = nxt > 0 ? nxt : 2;
-                setTimeout(render, nxt);
+                setTimeout(render, bufferinSecs * 200);
             }
             render();
             const bufferSource = audio.ctx.createBufferSource();
@@ -256,5 +286,9 @@
         };
     </script>
 </head>
-<body></body>
+<body>
+    <ul>
+        <li style="display:flex;align-items: center;"><label>SampleRate:</label><p id="sampleRateUx"></p></li>
+    </ul>
+</body>
 </html>
