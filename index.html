@@ -275,14 +275,30 @@
                     time += bufferinSecs * 1000.;
                     rendered = false;
                 }
-                setTimeout(render, bufferinSecs * 200);
+                window.requestAnimationFrame(render);
             }
-            render();
-            const bufferSource = audio.ctx.createBufferSource();
-            bufferSource.buffer = audio.buffer.data;
-            bufferSource.connect(audio.ctx.destination);
-            bufferSource.start();
-            bufferSource.loop = true;
+            window.requestAnimationFrame(render);
+
+            let bufferSource = false;
+            function resumeBufferSource(bs) {
+                if (!bs) {
+                    bs = audio.ctx.createBufferSource();
+                    bs.buffer = audio.buffer.data;
+                    bs.connect(audio.ctx.destination);
+                    bs.start();
+                    bs.loop = true;
+                }
+            }
+            function pauseBufferSource(bs) {
+                if (bs) {
+                    bs.stop();
+                }
+                //bs = false;
+            }
+            resumeBufferSource(bufferSource);
+
+            window.addEventListener("focus", () => {resumeBufferSource(bufferSource);});
+            window.addEventListener("blur", () => {pauseBufferSource(bufferSource);});
         };
     </script>
 </head>
