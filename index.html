@@ -131,7 +131,7 @@
             setupGlobals();
             float st = (gl_FragCoord.x + gl_FragCoord.y * 512.) * channels
                 + u_curr_buffer * u_buffer_size;
-                if (channels == 1.) {
+                if (channels == -1.) {
                     fragColor = vec4(render(st), 0., 0., 0.);
                 } else {
                     fragColor = vec4(render(st), render(st+1.), render(st+2.), render(st+3.));
@@ -228,8 +228,8 @@
             // INITIALIZES THE TEXTURE
             let texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
-            //gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, audio.buffer.obj.w, audio.buffer.obj.h, 0, gl.RGBA, gl.FLOAT, null); // <- 4 channels
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, audio.buffer.obj.w, audio.buffer.obj.h, 0, gl.RED, gl.FLOAT, null);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, audio.buffer.obj.w, audio.buffer.obj.h / 4, 0, gl.RGBA, gl.FLOAT, null); // <- 4 channels
+            //gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, audio.buffer.obj.w, audio.buffer.obj.h, 0, gl.RED, gl.FLOAT, null);
 
             try {
                 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
@@ -271,8 +271,8 @@
                     gl.uniform1f(bufferIndexLoc, curr_buffer_index);
                     gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length * .5);
                     // GRAB IT!!
-                    //gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RGBA, gl.FLOAT, audioData);  // <- 4 channels
-                    gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RED, gl.FLOAT, audioData);
+                    gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h / 4, gl.RGBA, gl.FLOAT, audioData);  // <- 4 channels
+                    //gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RED, gl.FLOAT, audioData);
                     sizedAudioData =  audioData.subarray(0, audio.buffer.size);
                 }
                 rendered ++;
@@ -309,7 +309,7 @@
     </script>
 </head>
 <body>
-    <p>v: 0.0.003</p>
+    <p>v: 0.0.004</p>
     <ul>
         <li style="display:flex;align-items: center;"><label>SampleRate:</label><p id="sampleRateUx"></p></li>
     </ul>
