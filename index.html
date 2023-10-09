@@ -9,7 +9,7 @@
     </script>
     <script id="shader-fs" type="x-shader/x-fragment" src="./sound.frag.glsl">#version 300 es
         #define M_PI2 6.28318530717958647692528676755900576839
-        precision highp float;
+        precision mediump float;
         out vec4 fragColor;
         //out float fragColor;
         uniform float u_curr_buffer;
@@ -140,10 +140,11 @@
     </script>
     <script type="text/javascript">
         let started = false;
-        const canvas = new OffscreenCanvas(512, 512);
+        const canvas = new OffscreenCanvas(512, 100);
         const bufferinSecs = .2;
         const gl = canvas.getContext('webgl2');
         const channels = 1;
+        const audioChannels = 2;
         if (!gl) {
             console.error("Unable to initialize WebGL 2. Your browser may not support it.");
         }
@@ -164,7 +165,7 @@
                         w: 512,
                         h: Math.ceil((bufferSize) / 512 * channels)
                     },
-                    data: ctx.createBuffer(2, bufferSize * 2, sampleRate)
+                    data: ctx.createBuffer(channels, bufferSize * 2, sampleRate)
                 }
             }
         }
@@ -252,14 +253,17 @@
             let curr_buffer_index = 0.0;
             let where = true;
             let audioData = new Float32Array(audio.buffer.obj.w * audio.buffer.obj.h * channels);
-            debugger;
+
             const bufferInMillis = bufferinSecs * 1000.;
             function render() {
                 const now = Date.now();
                 if (rendered === 2) {
                     let sizedAudioData = audioData.subarray(0, audio.buffer.size);
                     audio.buffer.data.copyToChannel(sizedAudioData, 0, !where ? 0 : audio.buffer.size); // Left Channel
-                    audio.buffer.data.copyToChannel(sizedAudioData, 1, !where ? 0 : audio.buffer.size); // Right Channel
+                    if (channels > 1) {
+                        //audio.buffer.data.copyToChannel(sizedAudioData, 1, !where ? 0 : audio.buffer.size); // Right Channel
+                    }
+
                     where = !where;
                 }
                 if (rendered === 0) {
@@ -304,7 +308,7 @@
     </script>
 </head>
 <body>
-    <p>v: 0.0.001</p>
+    <p>v: 0.0.002</p>
     <ul>
         <li style="display:flex;align-items: center;"><label>SampleRate:</label><p id="sampleRateUx"></p></li>
     </ul>
