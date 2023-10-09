@@ -129,7 +129,7 @@
 
         void main() {
             setupGlobals();
-            float st = (gl_FragCoord.x + gl_FragCoord.y * 512.) * channels
+            float st = (gl_FragCoord.x + gl_FragCoord.y * 512.) * channels * 4.
                 + u_curr_buffer * u_buffer_size;
                 if (channels == -1.) {
                     fragColor = vec4(render(st), 0., 0., 0.);
@@ -309,7 +309,7 @@
     </script>
 </head>
 <body>
-    <p>v: 0.0.004</p>
+    <p>v: 0.0.5</p>
     <ul>
         <li style="display:flex;align-items: center;"><label>SampleRate:</label><p id="sampleRateUx"></p></li>
     </ul>
