@@ -15,6 +15,7 @@
         uniform float u_curr_buffer;
         uniform float u_sample_rate; // USUALLY 44100
         uniform float u_buffer_size;
+        uniform float u_debug;
 
         float channels = 1.;
         float time = 0.;
@@ -131,17 +132,22 @@
             setupGlobals();
             float st = (gl_FragCoord.x + gl_FragCoord.y * 512.) * channels * 4.
                 + u_curr_buffer * u_buffer_size;
+            if (u_debug < .5) {
                 if (channels == -1.) {
                     fragColor = vec4(render(st), 0., 0., 0.);
                 } else {
                     fragColor = vec4(render(st), render(st+1.), render(st+2.), render(st+3.));
+                }
+            } else {
+                fragColor = vec4(u_buffer_size, u_curr_buffer, u_sample_rate, st);
             }
         }
     </script>
     <script type="text/javascript">
         let started = false;
+        let debug = false;
         const canvas = new OffscreenCanvas(512, 100);
-        const bufferinSecs = .5;
+        const bufferinSecs = 1.;
         const gl = canvas.getContext('webgl2');
         const channels = 1;
         const audioChannels = 2;
@@ -212,6 +218,9 @@
             var sampleRateLoc = gl.getUniformLocation(program, "u_sample_rate");
             gl.uniform1f(sampleRateLoc, audio.sampleRate);
 
+            var debugLoc = gl.getUniformLocation(program, "u_debug");
+            gl.uniform1f(debugLoc, 0.);
+
 
             /// INIT THE VERTICES FOR THE TRIANGLE STRIP
             const v = 1.0;
@@ -270,6 +279,7 @@
                 }
                 if (rendered === 0) {
                     /// NOW!!! get DA DATA!!!
+                    gl.uniform1f(debugLoc, debug ? 1. : 0.);
                     gl.uniform1f(bufferIndexLoc, curr_buffer_index);
                     gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length * .5);
                     // GRAB IT!!
@@ -311,7 +321,7 @@
     </script>
 </head>
 <body>
-    <p>v: 0.0.6</p>
+    <p>v: 0.0.7</p>
     <ul>
         <li style="display:flex;align-items: center;"><label>SampleRate:</label><p id="sampleRateUx"></p></li>
     </ul>
