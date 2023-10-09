@@ -145,6 +145,7 @@
         const gl = canvas.getContext('webgl2');
         const channels = 1;
         const audioChannels = 2;
+        const internalChannels = 4;
         if (!gl) {
             console.error("Unable to initialize WebGL 2. Your browser may not support it.");
         }
@@ -154,6 +155,7 @@
             const ctx = new AudioContext();
             const sampleRate = ctx.sampleRate; // often 44100 Hz
             const bufferSize = sampleRate * bufferinSecs; // total number of samples = sampleRate * duration
+
             document.getElementById("sampleRateUx").innerText = sampleRate;
 
             return {
@@ -163,7 +165,7 @@
                     size: bufferSize, // total number of samples = sampleRate * duration
                     obj: {
                         w: 512,
-                        h: Math.ceil((bufferSize) / 512 * channels)
+                        h: Math.ceil((bufferSize) / 512 * channels / internalChannels)
                     },
                     data: ctx.createBuffer(channels, bufferSize * 2, sampleRate)
                 }
@@ -228,7 +230,7 @@
             // INITIALIZES THE TEXTURE
             let texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, audio.buffer.obj.w, audio.buffer.obj.h / 4, 0, gl.RGBA, gl.FLOAT, null); // <- 4 channels
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, audio.buffer.obj.w, audio.buffer.obj.h, 0, gl.RGBA, gl.FLOAT, null); // <- 4 channels
             //gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, audio.buffer.obj.w, audio.buffer.obj.h, 0, gl.RED, gl.FLOAT, null);
 
             try {
@@ -252,7 +254,7 @@
             let rendered = 0;
             let curr_buffer_index = 0.0;
             let where = true;
-            let audioData = new Float32Array(audio.buffer.obj.w * audio.buffer.obj.h * channels);
+            let audioData = new Float32Array(audio.buffer.obj.w * audio.buffer.obj.h * channels * internalChannels);
             let sizedAudioData =  new Float32Array();audioData.subarray(0, audio.buffer.size);
             const bufferInMillis = bufferinSecs * 1000.;
             function render() {
@@ -271,7 +273,7 @@
                     gl.uniform1f(bufferIndexLoc, curr_buffer_index);
                     gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length * .5);
                     // GRAB IT!!
-                    gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h / 4, gl.RGBA, gl.FLOAT, audioData);  // <- 4 channels
+                    gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RGBA, gl.FLOAT, audioData);  // <- 4 channels
                     //gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RED, gl.FLOAT, audioData);
                     sizedAudioData =  audioData.subarray(0, audio.buffer.size);
                 }
@@ -309,7 +311,7 @@
     </script>
 </head>
 <body>
-    <p>v: 0.0.5</p>
+    <p>v: 0.0.6</p>
     <ul>
         <li style="display:flex;align-items: center;"><label>SampleRate:</label><p id="sampleRateUx"></p></li>
     </ul>
