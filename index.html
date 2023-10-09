@@ -162,7 +162,7 @@
                     size: bufferSize, // total number of samples = sampleRate * duration
                     obj: {
                         w: 512,
-                        h: Math.ceil((bufferSize) / 512 / channels)
+                        h: Math.ceil((bufferSize) / 512 * channels)
                     },
                     data: ctx.createBuffer(2, bufferSize * 2, sampleRate)
                 }
@@ -248,32 +248,33 @@
             }
 
             let time = Date.now();
-            let rendered = false;
+            let rendered = 0;
             let curr_buffer_index = 0.0;
             let where = true;
             let audioData = new Float32Array(audio.buffer.obj.w * audio.buffer.obj.h * channels);
-
+            debugger;
+            const bufferInMillis = bufferinSecs * 1000.;
             function render() {
                 const now = Date.now();
-                if (!rendered) {
+                if (rendered === 2) {
+                    let sizedAudioData = audioData.subarray(0, audio.buffer.size);
+                    audio.buffer.data.copyToChannel(sizedAudioData, 0, !where ? 0 : audio.buffer.size); // Left Channel
+                    audio.buffer.data.copyToChannel(sizedAudioData, 1, !where ? 0 : audio.buffer.size); // Right Channel
+                    where = !where;
+                }
+                if (rendered === 0) {
                     /// NOW!!! get DA DATA!!!
                     gl.uniform1f(bufferIndexLoc, curr_buffer_index);
                     gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length * .5);
                     // GRAB IT!!
                     //gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RGBA, gl.FLOAT, audioData);  // <- 4 channels
                     gl.readPixels(0, 0, audio.buffer.obj.w, audio.buffer.obj.h, gl.RED, gl.FLOAT, audioData);
-
-                    let sizedAudioData = audioData.subarray(0, audio.buffer.size);
-                    audio.buffer.data.copyToChannel(sizedAudioData, 0, !where ? 0 : audio.buffer.size); // Left Channel
-                    audio.buffer.data.copyToChannel(sizedAudioData, 1, !where ? 0 : audio.buffer.size); // Right Channel
-
-                    where = !where;
-                    rendered = true;
                 }
-                if (now - time >= bufferinSecs * 1000.) {
+                rendered ++;
+                if (now - time >= bufferInMillis) {
                     curr_buffer_index += 1.0;
-                    time += bufferinSecs * 1000.;
-                    rendered = false;
+                    time += bufferInMillis;
+                    rendered = 0;
                 }
                 window.requestAnimationFrame(render);
             }
